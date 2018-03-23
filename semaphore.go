@@ -77,6 +77,7 @@ func (s *Semaphore) init() (error error) {
 	for i = 0; i < s.opts.size; i++ {
 		pushPipe.LPush(s.keyAvailable, s.generateToken())
 	}
+	pushPipe.Expire(s.keyAvailable, s.opts.keysExpiration)
 
 	if _, err := pushPipe.Exec(); err != nil {
 		error = errors.Wrap(err, "pushing worker tokens")
@@ -91,8 +92,12 @@ func (s *Semaphore) generateToken() string {
 }
 
 func (s *Semaphore) acquireToken(token string) error {
-	if err := s.opts.rc.HSet(s.keyGrabbed, token, time.Now().UnixNano()).Err(); err != nil {
-		return err
+	pipe := s.opts.rc.Pipeline()
+	pipe.HSet(s.keyGrabbed, token, time.Now().UnixNano())
+	pipe.Expire(s.keyGrabbed, s.opts.keysExpiration)
+
+	if _, err := pipe.Exec(); err != nil {
+		return errors.Wrap(err, "set get grabbed")
 	}
 
 	s.m.Lock()
