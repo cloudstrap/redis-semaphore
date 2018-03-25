@@ -78,6 +78,7 @@ func (s *Semaphore) init() (error error) {
 		pushPipe.LPush(s.keyAvailable, s.generateToken())
 	}
 	pushPipe.Expire(s.keyAvailable, s.opts.keysExpiration)
+	pushPipe.LTrim(s.keyAvailable, 0, s.opts.size-1)
 
 	if _, err := pushPipe.Exec(); err != nil {
 		error = errors.Wrap(err, "pushing worker tokens")
